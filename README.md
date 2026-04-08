@@ -49,7 +49,16 @@ uv run simuhome health         # Verify it's running
 
 ## Evaluation
 
-The benchmark dataset is pre-included in `data/benchmark/`.
+The current benchmark snapshot is pre-included in `data/benchmark/`.
+
+> [!IMPORTANT]
+> **Benchmark version note** </br>
+> The benchmark included in `data/benchmark/` is the current reproducible benchmark snapshot for this repository.
+> It is reproducible under the same seeds and settings within the current simulator version.
+>
+> After the paper experiments, the simulator was enhanced for higher-fidelity smart-home simulation, and the benchmark episodes were regenerated based on this updated simulator.
+> As a result, the current benchmark snapshot is not identical to the one used to produce Table 1 in the paper.
+> Therefore, results obtained from the current repository should not be expected to exactly match the paper's reported numbers, even when using the same evaluation protocol, ReAct prompt, and model setup.
 
 **1. Configure** `eval_spec.example.yaml`:
 
