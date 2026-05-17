@@ -96,6 +96,7 @@ class OpenAIChatProvider(LLMProvider):
             raise ValueError("api_key must be provided explicitly")
 
         self._is_openrouter = "openrouter.ai" in (resolved_base or "").lower()
+        self._is_deepseek = "deepseek.com" in (resolved_base or "").lower()
         self._openrouter_require_parameters = _env_bool(
             "OPENROUTER_REQUIRE_PARAMETERS", False
         )
@@ -122,7 +123,10 @@ class OpenAIChatProvider(LLMProvider):
             "messages": oa_msgs,
         }
         if response_format:
-            kwargs["response_format"] = response_format
+            if self._is_deepseek and response_format.get("type") == "json_schema":
+                kwargs["response_format"] = {"type": "json_object"}
+            else:
+                kwargs["response_format"] = response_format
 
         if self._is_openrouter:
             extra_body: Dict[str, Any] = {}
