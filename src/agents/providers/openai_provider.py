@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
 import os
+import sys
 import time
 import importlib
+from datetime import datetime
 from typing import Any, Dict, Optional, Sequence
 
 
@@ -64,6 +67,19 @@ def _is_context_overflow_error(message: str) -> bool:
         "input_tokens",
     )
     return any(marker in text for marker in markers)
+
+
+_TRACE_FILE = None
+
+
+def _trace(msg: str) -> None:
+    global _TRACE_FILE
+    if _TRACE_FILE is None:
+        path = os.path.join(os.getcwd(), "llm_trace.log")
+        _TRACE_FILE = open(path, "a", encoding="utf-8")
+    ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+    _TRACE_FILE.write(f"[{ts}] {msg}\n")
+    _TRACE_FILE.flush()
 
 
 class OpenAIChatProvider(LLMProvider):
@@ -141,12 +157,35 @@ class OpenAIChatProvider(LLMProvider):
         retries = 0
         max_attempts = self.max_retries + 1
 
+        _trace(f"\n{'='*60}")
+        _trace(f"[LLM REQ] model={self.model} | base={self._client.base_url} | temperature={self.temperature} | seed={self.seed}")
+        _trace(f"[LLM REQ] response_format={json.dumps(kwargs.get('response_format', {}))}")
+        _trace(f"[LLM REQ] messages({len(kwargs['messages'])} total):")
+        for i, m in enumerate(kwargs['messages']):
+            role = m.get('role', '?')
+            content = m.get('content', '')
+            preview = content[:200].replace('\n', '\\n')
+            suffix = '...' if len(content) > 200 else ''
+            _trace(f"  [{i}] {role}: {preview}{suffix}")
+        _trace(f"{'='*60}")
+
+        _call_number = getattr(self, '_call_number', 0) + 1
+        self._call_number = _call_number
+
         while retries < max_attempts:
             try:
                 resp = self._client.chat.completions.create(**kwargs)
                 content = resp.choices[0].message.content
+                usage = getattr(resp, 'usage', None)
+                prompt_tok = getattr(usage, 'prompt_tokens', '?') if usage else '?'
+                completion_tok = getattr(usage, 'completion_tokens', '?') if usage else '?'
+                _trace(f"[LLM RESP #{self._call_number}] tokens(prompt={prompt_tok}, completion={completion_tok})")
+                _trace(f"[LLM RESP #{self._call_number}] content({len(content or '')} chars): {(content or '')[:500]}")
+                if len(content or '') > 500:
+                    _trace(f"[LLM RESP #{self._call_number}] ...truncated, {len(content)} chars total")
                 if not content:
                     raise EmptyLLMResponseError("LLM response content was empty")
+                _trace(f"[LLM OK  #{self._call_number}] returning {len(content)} chars")
                 return content
             except EmptyLLMResponseError as e:
                 raise
